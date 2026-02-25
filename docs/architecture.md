@@ -17,6 +17,7 @@ flowchart LR
     user["User"] --> ui["Streamlit UI<br/>app.py"]
     ui --> docs["Document parser/chunker<br/>chatbot/documents.py"]
     docs --> idx["In-memory TF-IDF index<br/>chatbot/retrieval.py"]
+    docs --> ocr["OCR engine<br/>Tesseract (optional)"]
     ui --> retrieve["Retrieve relevant chunks"]
     retrieve --> idx
     retrieve --> llm["Answer generator<br/>chatbot/llm.py"]
@@ -45,6 +46,9 @@ sequenceDiagram
             Docs->>Docs: extract_text_from_docx()
         else .pdf
             Docs->>Docs: extract_text_from_pdf()
+            alt page has little/no extractable text
+                Docs->>Docs: OCR fallback (pypdfium2 + Tesseract)
+            end
         end
         Docs->>Docs: chunk_text()
         Docs-->>UI: list[DocumentChunk]
@@ -145,19 +149,22 @@ Environment variables loaded from `.env`:
 
 - `OPENAI_API_KEY`: optional; enables full LLM answers
 - `OPENAI_MODEL`: optional; defaults to `gpt-4o-mini`
+- `TESSERACT_CMD`: optional path to `tesseract` executable if not on PATH
+- `OCR_LANGUAGE`: optional OCR language code; defaults to `eng`
 
 If no API key is set, the chatbot still retrieves relevant chunks and returns excerpt-based fallback responses.
 
 ## Known Limitations
 
-- PDF support is text extraction only; scanned/image PDFs need OCR.
+- OCR requires the Tesseract engine to be installed on the host machine.
+- OCR is slower than normal text extraction for large PDFs.
 - Index is in-memory (not persisted).
 - Retrieval is lexical TF-IDF (not semantic embeddings).
 - No authentication or per-user document isolation yet.
 
 ## Extension Points
 
-- Add OCR for scanned PDFs (for example, `pytesseract` + `pdf2image`).
+- Improve OCR quality with page pre-processing and custom language packs.
 - Replace TF-IDF with embeddings + vector database.
 - Persist per-document indexes to disk or external storage.
 - Add citations with exact page/paragraph metadata.

@@ -39,7 +39,11 @@ def _render_history() -> None:
                 _show_sources(message.get("sources", []))
 
 
-def _process_uploads(chunk_size: int, chunk_overlap: int) -> None:
+def _process_uploads(
+    chunk_size: int,
+    chunk_overlap: int,
+    enable_pdf_ocr: bool,
+) -> None:
     uploaded_files = st.session_state.get("uploaded_files", [])
     if not uploaded_files:
         st.sidebar.warning("Upload at least one .docx or .pdf file first.")
@@ -48,7 +52,7 @@ def _process_uploads(chunk_size: int, chunk_overlap: int) -> None:
     all_chunks = []
     failed_files: list[str] = []
 
-    with st.sidebar.spinner("Reading and indexing documents..."):
+    with st.sidebar.spinner("Reading, OCR, and indexing documents..."):
         for uploaded_file in uploaded_files:
             try:
                 chunks = build_chunks_from_file(
@@ -56,13 +60,18 @@ def _process_uploads(chunk_size: int, chunk_overlap: int) -> None:
                     file_bytes=uploaded_file.getvalue(),
                     chunk_size=chunk_size,
                     chunk_overlap=chunk_overlap,
+                    enable_pdf_ocr=enable_pdf_ocr,
                 )
                 if chunks:
                     all_chunks.extend(chunks)
                 else:
                     failed_files.append(uploaded_file.name)
-            except Exception:
-                failed_files.append(uploaded_file.name)
+            except Exception as exc:
+                reason = str(exc).strip()
+                if reason:
+                    failed_files.append(f"{uploaded_file.name} ({reason})")
+                else:
+                    failed_files.append(uploaded_file.name)
 
     if not all_chunks:
         st.sidebar.error("No readable text found in the selected files.")
@@ -110,12 +119,20 @@ def main() -> None:
         value=40,
         step=10,
     )
+    enable_pdf_ocr = st.sidebar.checkbox(
+        "Enable OCR for scanned PDFs",
+        value=True,
+        help=(
+            "Uses Tesseract OCR when a PDF page has little or no extractable text. "
+            "This improves scanned PDF support but can be slower."
+        ),
+    )
 
     st.sidebar.button(
         "Process documents",
         use_container_width=True,
         on_click=_process_uploads,
-        args=(chunk_size, chunk_overlap),
+        args=(chunk_size, chunk_overlap, enable_pdf_ocr),
     )
 
     if st.sidebar.button("Clear chat", use_container_width=True):
