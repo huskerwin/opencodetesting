@@ -1,10 +1,16 @@
 # Document Chatbot
 
+[![CI](https://github.com/huskerwin/opencodetesting/actions/workflows/ci.yml/badge.svg)](https://github.com/huskerwin/opencodetesting/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 This project is a Streamlit chatbot that lets users upload documents and ask questions about the content.
 
-## Architecture documentation
+## Documentation
 
 - Full architecture and runtime diagrams: `docs/architecture.md`
+- Usage guide: `docs/usage.md`
+- Deployment notes: `docs/deployment.md`
+- Changelog: `CHANGELOG.md`
 
 ## What it does
 
@@ -78,6 +84,14 @@ python -m pytest -q
 
 The tests cover core ingestion, OCR fallback logic, retrieval ranking, LLM
 fallback behavior, and upload processing workflows.
+
+## Project standards
+
+- License: `LICENSE` (MIT)
+- Contributing: `CONTRIBUTING.md`
+- Code of conduct: `CODE_OF_CONDUCT.md`
+- Security policy: `SECURITY.md`
+- Support channels: `SUPPORT.md`
 
 ## Notes
 
