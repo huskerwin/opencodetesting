@@ -1,3 +1,5 @@
+"""Streamlit entrypoint for document upload, indexing, and Q&A chat."""
+
 from __future__ import annotations
 
 import streamlit as st
@@ -8,6 +10,8 @@ from chatbot.retrieval import InMemoryTfidfIndex
 
 
 def _initialize_state() -> None:
+    """Ensure all required Streamlit session keys are initialized."""
+
     if "chunks" not in st.session_state:
         st.session_state.chunks = []
     if "index" not in st.session_state:
@@ -19,6 +23,8 @@ def _initialize_state() -> None:
 
 
 def _show_sources(sources: list[dict[str, str | float]]) -> None:
+    """Render source citations for an assistant response."""
+
     if not sources:
         return
 
@@ -32,6 +38,8 @@ def _show_sources(sources: list[dict[str, str | float]]) -> None:
 
 
 def _render_history() -> None:
+    """Render all prior chat messages for the current session."""
+
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
@@ -44,6 +52,8 @@ def _process_uploads(
     chunk_overlap: int,
     enable_pdf_ocr: bool,
 ) -> None:
+    """Parse uploads, build chunks, and rebuild the retrieval index."""
+
     uploaded_files = st.session_state.get("uploaded_files", [])
     if not uploaded_files:
         st.sidebar.warning("Upload at least one .docx or .pdf file first.")
@@ -67,6 +77,7 @@ def _process_uploads(
                 else:
                     failed_files.append(uploaded_file.name)
             except Exception as exc:
+                # Surface the parse reason so users can fix OCR/setup issues.
                 reason = str(exc).strip()
                 if reason:
                     failed_files.append(f"{uploaded_file.name} ({reason})")
@@ -92,6 +103,8 @@ def _process_uploads(
 
 
 def main() -> None:
+    """Configure UI controls and run the interactive chat loop."""
+
     st.set_page_config(page_title="Document Chatbot", page_icon=":books:", layout="wide")
     st.title("Document Chatbot")
     st.caption("Upload .docx or .pdf files and ask questions about their content.")

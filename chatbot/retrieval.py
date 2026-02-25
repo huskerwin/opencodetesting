@@ -1,3 +1,10 @@
+"""In-memory lexical retrieval based on TF-IDF and cosine similarity.
+
+The app is intentionally lightweight and does not require a vector database.
+This module provides deterministic retrieval over document chunks so answers can
+be grounded in user-uploaded content.
+"""
+
 from __future__ import annotations
 
 from collections import Counter
@@ -12,17 +19,25 @@ TOKEN_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9'-]*")
 
 
 def tokenize(text: str) -> list[str]:
+    """Tokenize text into normalized terms for indexing and querying."""
+
     return [match.group(0).lower() for match in TOKEN_PATTERN.finditer(text)]
 
 
 @dataclass(frozen=True)
 class SearchResult:
+    """Single retrieval hit with its corresponding relevance score."""
+
     chunk: DocumentChunk
     score: float
 
 
 class InMemoryTfidfIndex:
+    """Simple TF-IDF index over `DocumentChunk` records."""
+
     def __init__(self, chunks: list[DocumentChunk]) -> None:
+        """Build an index from pre-chunked document text."""
+
         self.chunks = chunks
         self._idf: dict[str, float] = {}
         self._vectors: list[dict[str, float]] = []
@@ -30,6 +45,8 @@ class InMemoryTfidfIndex:
         self._build()
 
     def _build(self) -> None:
+        """Precompute IDF values and chunk vectors for fast search."""
+
         if not self.chunks:
             return
 
@@ -52,6 +69,8 @@ class InMemoryTfidfIndex:
             self._norms.append(norm)
 
     def _vectorize_terms(self, terms: list[str]) -> dict[str, float]:
+        """Convert token sequences into TF-IDF vectors."""
+
         term_counts: Counter[str] = Counter(terms)
         if not term_counts:
             return {}
@@ -70,11 +89,15 @@ class InMemoryTfidfIndex:
 
     @staticmethod
     def _dot(left: dict[str, float], right: dict[str, float]) -> float:
+        """Compute dot product while iterating over the smaller dictionary."""
+
         if len(left) > len(right):
             left, right = right, left
         return sum(weight * right.get(term, 0.0) for term, weight in left.items())
 
     def search(self, query: str, top_k: int = 5, min_score: float = 0.05) -> list[SearchResult]:
+        """Return the top matching chunks for a natural language query."""
+
         if not self.chunks:
             return []
 
@@ -106,6 +129,11 @@ class InMemoryTfidfIndex:
 
 
 def build_context(results: list[SearchResult], max_chars: int = 8000) -> str:
+    """Format retrieval hits into a context string for LLM prompting.
+
+    Each block includes chunk metadata so the assistant can cite sources.
+    """
+
     sections: list[str] = []
     total_chars = 0
 

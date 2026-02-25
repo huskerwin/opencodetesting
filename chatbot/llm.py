@@ -1,3 +1,5 @@
+"""LLM orchestration for grounded answers over retrieved document chunks."""
+
 from __future__ import annotations
 
 import os
@@ -23,7 +25,11 @@ When possible, include short citations in parentheses using chunk ids.
 
 
 class AnswerGenerator:
+    """Generate answers using retrieval context and optional OpenAI access."""
+
     def __init__(self) -> None:
+        """Load runtime configuration and initialize OpenAI client if possible."""
+
         load_dotenv()
         self.model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
         self.api_key = os.getenv("OPENAI_API_KEY", "").strip()
@@ -35,6 +41,12 @@ class AnswerGenerator:
         results: Sequence[SearchResult],
         history: Sequence[dict[str, str]],
     ) -> str:
+        """Return an answer grounded in retrieved chunks.
+
+        The method gracefully degrades to retrieval-only mode when no API key is
+        configured or when the upstream API call fails.
+        """
+
         if not results:
             return "I could not find relevant text in the uploaded documents for that question."
 
@@ -45,6 +57,8 @@ class AnswerGenerator:
 
         messages: list[dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
 
+        # Include a short conversational window so follow-up questions retain
+        # context without sending unbounded history to the model.
         for message in history[-8:]:
             role = message.get("role")
             content = message.get("content", "").strip()
@@ -74,6 +88,8 @@ class AnswerGenerator:
         return self._fallback_answer(results)
 
     def _fallback_answer(self, results: Sequence[SearchResult]) -> str:
+        """Return a deterministic fallback response using top retrieved snippets."""
+
         lines = [
             "I found relevant passages, but no LLM is configured.",
             "Set OPENAI_API_KEY in your .env file for full conversational answers.",

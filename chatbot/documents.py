@@ -1,3 +1,13 @@
+"""Document ingestion helpers for `.docx` and `.pdf` files.
+
+This module centralizes all steps required to transform uploaded files into
+`DocumentChunk` objects that can be indexed by the retrieval layer:
+
+1. Parse raw file bytes into normalized text
+2. Apply optional OCR fallback for scanned PDF pages
+3. Split text into overlapping chunks for downstream search
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -24,26 +34,53 @@ DEFAULT_TESSERACT_PATHS = (
 
 @dataclass(frozen=True)
 class DocumentChunk:
+    """A single searchable text segment extracted from an uploaded document.
+
+    Attributes:
+        chunk_id: Stable identifier used for citations in responses.
+        source_name: Original filename so users can trace the source.
+        text: Chunk content used by retrieval and prompting.
+    """
+
     chunk_id: str
     source_name: str
     text: str
 
 
 def _normalize_text(value: str) -> str:
+    """Collapse repeated whitespace and trim leading/trailing spaces."""
+
     return WHITESPACE_PATTERN.sub(" ", value).strip()
 
 
 def _slugify(value: str) -> str:
+    """Convert arbitrary file names into safe chunk-id prefixes."""
+
     slug = SLUG_PATTERN.sub("-", value.strip().lower()).strip("-")
     return slug or "document"
 
 
 def _has_enough_text(value: str, min_chars: int = MIN_DIRECT_PDF_TEXT_CHARS) -> bool:
+    """Return True when text likely came from real extraction, not noise.
+
+    PDF text extraction for scanned pages often yields short or garbage strings.
+    Counting alphanumeric characters gives a simple signal for when OCR should
+    be attempted.
+    """
+
     meaningful_chars = sum(character.isalnum() for character in value)
     return meaningful_chars >= min_chars
 
 
 def _resolve_tesseract_cmd() -> str:
+    """Resolve which Tesseract executable path should be used.
+
+    Order of precedence:
+    1. `TESSERACT_CMD` from environment
+    2. Common Windows install paths
+    3. `tesseract` (rely on PATH)
+    """
+
     configured_path = os.getenv("TESSERACT_CMD", "").strip()
     if configured_path:
         return configured_path
@@ -56,6 +93,12 @@ def _resolve_tesseract_cmd() -> str:
 
 
 def extract_text_from_docx(file_bytes: bytes) -> str:
+    """Extract normalized text from a Word document.
+
+    Paragraphs and table cells are both included so structured content is not
+    silently dropped.
+    """
+
     document = Document(BytesIO(file_bytes))
     blocks: list[str] = []
 
@@ -80,6 +123,13 @@ def _extract_text_from_pdf_with_ocr(
     language: str,
     scale: float,
 ) -> dict[int, str]:
+    """Run OCR for selected PDF pages and return recovered text by page index.
+
+    The function renders target pages to images (via PDFium) and then applies
+    Tesseract OCR. It intentionally returns a mapping so callers can merge OCR
+    output with direct extraction on a per-page basis.
+    """
+
     try:
         import pypdfium2 as pdfium
     except ImportError as exc:  # pragma: no cover - runtime dependency
@@ -99,6 +149,7 @@ def _extract_text_from_pdf_with_ocr(
 
     pytesseract.pytesseract.tesseract_cmd = _resolve_tesseract_cmd()
 
+    # Fail fast with a clear message when the OCR engine is unavailable.
     try:
         pytesseract.get_tesseract_version()
     except Exception as exc:  # pragma: no cover - machine specific
@@ -145,6 +196,13 @@ def extract_text_from_pdf(
     ocr_language: str | None = None,
     ocr_scale: float = DEFAULT_OCR_SCALE,
 ) -> str:
+    """Extract text from PDF bytes with optional OCR fallback.
+
+    Normal extraction is attempted first for every page. OCR only runs for pages
+    where direct extraction appears insufficient, which keeps processing faster
+    for digital PDFs while still supporting scanned PDFs.
+    """
+
     reader = PdfReader(BytesIO(file_bytes))
     page_texts: list[str] = []
     pages_for_ocr: list[int] = []
@@ -169,6 +227,8 @@ def extract_text_from_pdf(
                 scale=ocr_scale,
             )
         except RuntimeError:
+            # If we already have usable direct text from at least one page,
+            # keep that partial result instead of failing the entire upload.
             if not any(_has_enough_text(text, min_chars=1) for text in page_texts):
                 raise
         else:
@@ -184,6 +244,8 @@ def extract_text_from_file(
     file_bytes: bytes,
     enable_pdf_ocr: bool = True,
 ) -> str:
+    """Route file extraction to the parser matching the file extension."""
+
     extension = Path(file_name).suffix.lower()
 
     if extension == ".docx":
@@ -196,6 +258,12 @@ def extract_text_from_file(
 
 
 def chunk_text(text: str, chunk_size: int = 220, chunk_overlap: int = 40) -> list[str]:
+    """Split text into overlapping word-based chunks.
+
+    Overlap helps preserve context continuity between adjacent chunks so
+    retrieval has a better chance to return complete passages.
+    """
+
     if chunk_size <= 0:
         raise ValueError("chunk_size must be greater than zero")
     if chunk_overlap < 0:
@@ -228,6 +296,8 @@ def _build_chunks_from_text(
     chunk_size: int = 220,
     chunk_overlap: int = 40,
 ) -> list[DocumentChunk]:
+    """Convert raw text into `DocumentChunk` records with stable ids."""
+
     text_chunks = chunk_text(text, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
 
     source_slug = _slugify(file_name)
@@ -252,6 +322,8 @@ def build_chunks_from_file(
     chunk_overlap: int = 40,
     enable_pdf_ocr: bool = True,
 ) -> list[DocumentChunk]:
+    """High-level ingestion helper used by the UI upload pipeline."""
+
     text = extract_text_from_file(
         file_name=file_name,
         file_bytes=file_bytes,
@@ -271,6 +343,8 @@ def build_chunks_from_docx(
     chunk_size: int = 220,
     chunk_overlap: int = 40,
 ) -> list[DocumentChunk]:
+    """Backwards-compatible helper for direct `.docx` chunk generation."""
+
     text = extract_text_from_docx(file_bytes)
     return _build_chunks_from_text(
         file_name=file_name,

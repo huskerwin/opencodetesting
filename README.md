@@ -68,6 +68,17 @@ streamlit run app.py
 - Click **Process documents**
 - Ask questions in the chat box
 
+## Running tests
+
+Run the automated unit test suite with:
+
+```bash
+python -m pytest -q
+```
+
+The tests cover core ingestion, OCR fallback logic, retrieval ranking, LLM
+fallback behavior, and upload processing workflows.
+
 ## Notes
 
 - Current upload support is `.docx` and `.pdf` files.
