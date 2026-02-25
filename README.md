@@ -2,6 +2,10 @@
 
 This project is a Streamlit chatbot that lets users upload documents and ask questions about the content.
 
+## Architecture documentation
+
+- Full architecture and runtime diagrams: `docs/architecture.md`
+
 ## What it does
 
 - Upload one or more `.docx` or `.pdf` files
