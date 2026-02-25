@@ -2,13 +2,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from io import BytesIO
+from pathlib import Path
 import re
 
 from docx import Document
+from pypdf import PdfReader
 
 
 WHITESPACE_PATTERN = re.compile(r"\s+")
 SLUG_PATTERN = re.compile(r"[^a-zA-Z0-9]+")
+SUPPORTED_EXTENSIONS = {".docx", ".pdf"}
 
 
 @dataclass(frozen=True)
@@ -46,6 +49,31 @@ def extract_text_from_docx(file_bytes: bytes) -> str:
     return "\n".join(blocks)
 
 
+def extract_text_from_pdf(file_bytes: bytes) -> str:
+    reader = PdfReader(BytesIO(file_bytes))
+    blocks: list[str] = []
+
+    for page in reader.pages:
+        page_text = page.extract_text() or ""
+        cleaned = _normalize_text(page_text)
+        if cleaned:
+            blocks.append(cleaned)
+
+    return "\n".join(blocks)
+
+
+def extract_text_from_file(file_name: str, file_bytes: bytes) -> str:
+    extension = Path(file_name).suffix.lower()
+
+    if extension == ".docx":
+        return extract_text_from_docx(file_bytes)
+    if extension == ".pdf":
+        return extract_text_from_pdf(file_bytes)
+
+    supported = ", ".join(sorted(SUPPORTED_EXTENSIONS))
+    raise ValueError(f"Unsupported file type '{extension}'. Supported types: {supported}")
+
+
 def chunk_text(text: str, chunk_size: int = 220, chunk_overlap: int = 40) -> list[str]:
     if chunk_size <= 0:
         raise ValueError("chunk_size must be greater than zero")
@@ -73,13 +101,12 @@ def chunk_text(text: str, chunk_size: int = 220, chunk_overlap: int = 40) -> lis
     return chunks
 
 
-def build_chunks_from_docx(
+def _build_chunks_from_text(
     file_name: str,
-    file_bytes: bytes,
+    text: str,
     chunk_size: int = 220,
     chunk_overlap: int = 40,
 ) -> list[DocumentChunk]:
-    text = extract_text_from_docx(file_bytes)
     text_chunks = chunk_text(text, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
 
     source_slug = _slugify(file_name)
@@ -95,3 +122,33 @@ def build_chunks_from_docx(
         )
 
     return chunks
+
+
+def build_chunks_from_file(
+    file_name: str,
+    file_bytes: bytes,
+    chunk_size: int = 220,
+    chunk_overlap: int = 40,
+) -> list[DocumentChunk]:
+    text = extract_text_from_file(file_name=file_name, file_bytes=file_bytes)
+    return _build_chunks_from_text(
+        file_name=file_name,
+        text=text,
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+    )
+
+
+def build_chunks_from_docx(
+    file_name: str,
+    file_bytes: bytes,
+    chunk_size: int = 220,
+    chunk_overlap: int = 40,
+) -> list[DocumentChunk]:
+    text = extract_text_from_docx(file_bytes)
+    return _build_chunks_from_text(
+        file_name=file_name,
+        text=text,
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+    )

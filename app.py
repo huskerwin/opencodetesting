@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from chatbot.documents import build_chunks_from_docx
+from chatbot.documents import build_chunks_from_file
 from chatbot.llm import AnswerGenerator
 from chatbot.retrieval import InMemoryTfidfIndex
 
@@ -42,7 +42,7 @@ def _render_history() -> None:
 def _process_uploads(chunk_size: int, chunk_overlap: int) -> None:
     uploaded_files = st.session_state.get("uploaded_files", [])
     if not uploaded_files:
-        st.sidebar.warning("Upload at least one .docx file first.")
+        st.sidebar.warning("Upload at least one .docx or .pdf file first.")
         return
 
     all_chunks = []
@@ -51,7 +51,7 @@ def _process_uploads(chunk_size: int, chunk_overlap: int) -> None:
     with st.sidebar.spinner("Reading and indexing documents..."):
         for uploaded_file in uploaded_files:
             try:
-                chunks = build_chunks_from_docx(
+                chunks = build_chunks_from_file(
                     file_name=uploaded_file.name,
                     file_bytes=uploaded_file.getvalue(),
                     chunk_size=chunk_size,
@@ -83,16 +83,16 @@ def _process_uploads(chunk_size: int, chunk_overlap: int) -> None:
 
 
 def main() -> None:
-    st.set_page_config(page_title="Word Doc Chatbot", page_icon=":books:", layout="wide")
-    st.title("Word Document Chatbot")
-    st.caption("Upload .docx files and ask questions about their content.")
+    st.set_page_config(page_title="Document Chatbot", page_icon=":books:", layout="wide")
+    st.title("Document Chatbot")
+    st.caption("Upload .docx or .pdf files and ask questions about their content.")
 
     _initialize_state()
 
     st.sidebar.header("Document Setup")
     st.sidebar.file_uploader(
-        "Upload Word documents",
-        type=["docx"],
+        "Upload documents",
+        type=["docx", "pdf"],
         accept_multiple_files=True,
         key="uploaded_files",
     )
@@ -123,7 +123,7 @@ def main() -> None:
         st.sidebar.success("Chat history cleared.")
 
     if st.session_state.index is None:
-        st.info("Upload and process at least one .docx file to start chatting.")
+        st.info("Upload and process at least one .docx or .pdf file to start chatting.")
 
     _render_history()
 

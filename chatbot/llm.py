@@ -15,7 +15,7 @@ except ImportError:  # pragma: no cover - handled at runtime
 
 
 SYSTEM_PROMPT = """
-You are a careful assistant for question-answering over Word documents.
+You are a careful assistant for question-answering over uploaded documents.
 Only use the provided context snippets.
 If the context does not contain the answer, say you do not know.
 When possible, include short citations in parentheses using chunk ids.

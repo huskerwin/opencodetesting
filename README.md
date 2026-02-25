@@ -1,10 +1,10 @@
-# Word Document Chatbot
+# Document Chatbot
 
-This project is a Streamlit chatbot that lets users upload Word documents and ask questions about the content.
+This project is a Streamlit chatbot that lets users upload documents and ask questions about the content.
 
 ## What it does
 
-- Upload one or more `.docx` files
+- Upload one or more `.docx` or `.pdf` files
 - Extract text and split it into searchable chunks
 - Retrieve the most relevant chunks for each question
 - Generate an answer using OpenAI (if configured)
@@ -17,6 +17,7 @@ If no OpenAI key is configured, the app still works in retrieval mode and return
 - Python 3.11+
 - Streamlit for the chat UI
 - `python-docx` for reading Word files
+- `pypdf` for reading PDF files
 - In-memory TF-IDF retrieval (no external vector DB)
 - OpenAI Chat Completions API (optional, for best answers)
 
@@ -51,12 +52,13 @@ streamlit run app.py
 
 5. In the UI:
 
-- Upload `.docx` file(s)
+- Upload `.docx` or `.pdf` file(s)
 - Click **Process documents**
 - Ask questions in the chat box
 
 ## Notes
 
-- Current upload support is `.docx` files.
+- Current upload support is `.docx` and text-based `.pdf` files.
+- Scanned/image-only PDFs require OCR, which is not included in this MVP.
 - Large documents are chunked by words for better retrieval.
 - Retrieval is in-memory; restarting the app clears indexed documents.
